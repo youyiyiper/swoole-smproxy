@@ -1,0 +1,48 @@
+language: php
+
+dist: trusty
+
+matrix:
+  include:
+    - php: 7.0
+    - php: 7.1
+    - php: 7.2
+    - php: 7.2
+      env: LINT=true
+    - php: 7.2
+      env: PHAR=true
+
+addons:
+  apt:
+    sources:
+      - mysql-5.7-trusty
+    packages:
+      - mysql-server
+      - mysql-client
+
+install:
+  - printf "\n" | pecl install -f swoole-4.2.8
+
+before_script:
+  - phpenv config-rm xdebug.ini
+  - sudo mysql -e "use mysql; update user set authentication_string=PASSWORD('123456') where User='root'; update user set plugin='mysql_native_password';FLUSH PRIVILEGES;"
+  - sudo mysql_upgrade -u root -p123456
+  - sudo service mysql restart
+  - composer install --no-dev
+  - php -v
+  - php -m
+
+script:
+  - |
+    if [[ $LINT != "" ]]; then
+      composer install --dev
+      vendor/bin/phpcs
+    elif [[ $PHAR != "" ]]; then
+      composer install --dev
+      vendor/bin/box compile
+      ./SMProxy.phar start -c tests/conf
+      php tests/test.php
+    else
+      tests/run
+      php tests/test.php
+    fi
